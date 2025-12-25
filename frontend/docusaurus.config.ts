@@ -46,9 +46,6 @@ const config: Config = {
           editUrl:
             'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
         },
-        theme: {
-          customCss: './src/css/custom.css',
-        },
         blog: {
           showReadingTime: true,
           feedOptions: {
@@ -70,7 +67,13 @@ const config: Config = {
       } satisfies Preset.Options,
     ],
   ],
+  themes: [
+    '@docusaurus/theme-mermaid',
+  ],
 
+  markdown: {
+    mermaid: true,
+  },
   themeConfig: {
     // Replace with your project's social card
     image: 'img/docusaurus-social-card.jpg',

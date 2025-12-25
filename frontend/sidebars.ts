@@ -34,6 +34,36 @@ const sidebars: SidebarsConfig = {
             'modules/ros2/chapter3'
           ],
         },
+        {
+          type: 'category',
+          label: 'Module 02: The Digital Twin (Gazebo & Unity)',
+          items: [
+            'modules/digital-twin/index',
+            'modules/digital-twin/chapter1',
+            'modules/digital-twin/chapter2',
+            'modules/digital-twin/chapter3'
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Module 03: The AI-Robot Brain (NVIDIA Isaac™)',
+          items: [
+            'modules/isaac/index',
+            'modules/isaac/chapter1',
+            'modules/isaac/chapter2',
+            'modules/isaac/chapter3'
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Module 04: Vision-Language-Action (VLA)',
+          items: [
+            'modules/vla/index',
+            'modules/vla/chapter1',
+            'modules/vla/chapter2',
+            'modules/vla/chapter3'
+          ],
+        },
         // Additional modules can be added here in the future
       ],
     },
