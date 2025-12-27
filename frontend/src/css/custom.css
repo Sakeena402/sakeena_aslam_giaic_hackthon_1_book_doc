@@ -1,30 +1,111 @@
 /**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
+ * Global styles for Physical AI & Humanoid Robotics Book
+ * Clean, minimal, academic-first design
  */
 
-/* You can override the default Infima variables here. */
+/* ================================
+   Root Theme Variables (Light Mode)
+   ================================ */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
-  --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  /* Primary brand color — calm, intelligent green */
+  --ifm-color-primary: #256d4a;
+  --ifm-color-primary-dark: #1f5d40;
+  --ifm-color-primary-darker: #1c553b;
+  --ifm-color-primary-darkest: #164630;
+  --ifm-color-primary-light: #2e7f58;
+  --ifm-color-primary-lighter: #3a8f67;
+  --ifm-color-primary-lightest: #56a983;
+
+  /* Typography */
+  --ifm-font-family-base: Inter, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ifm-heading-font-family: Inter, system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --ifm-font-size-base: 16px;
+  --ifm-line-height-base: 1.65;
+
+  /* Code */
+  --ifm-code-font-size: 92%;
+  --docusaurus-highlighted-code-line-bg: rgba(37, 109, 74, 0.08);
+
+  /* UI polish */
+  --ifm-global-radius: 10px;
+  --ifm-global-shadow-lw: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
+/* ================================
+   Dark Mode Adjustments
+   ================================ */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-color-primary: #4fd1b5;
+  --ifm-color-primary-dark: #3cbfa3;
+  --ifm-color-primary-darker: #35b197;
+  --ifm-color-primary-darkest: #2a8f7b;
+  --ifm-color-primary-light: #63dcc4;
+  --ifm-color-primary-lighter: #7be2cf;
+  --ifm-color-primary-lightest: #a3efe1;
+
+  --docusaurus-highlighted-code-line-bg: rgba(79, 209, 181, 0.15);
+}
+
+/* ================================
+   Global Content Polish
+   ================================ */
+
+/* Improve paragraph readability */
+.markdown p {
+  max-width: 72ch;
+}
+
+/* Better heading spacing */
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  letter-spacing: -0.015em;
+  margin-top: 2.5rem;
+}
+
+/* Cleaner inline code */
+code {
+  border-radius: 6px;
+  padding: 0.15rem 0.35rem;
+}
+
+/* Code blocks */
+pre {
+  border-radius: 12px;
+  box-shadow: var(--ifm-global-shadow-lw);
+}
+
+/* Tables */
+table {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* ================================
+   Navbar & Footer Refinement
+   ================================ */
+.navbar {
+  box-shadow: none;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.footer {
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+/* ================================
+   Subtle Transitions
+   ================================ */
+a,
+button {
+  transition: color 0.2s ease, background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+/* Button hover polish */
+.button:hover {
+  transform: translateY(-1px);
 }

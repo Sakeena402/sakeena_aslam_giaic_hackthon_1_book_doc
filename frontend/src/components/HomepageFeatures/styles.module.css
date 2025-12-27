@@ -1,11 +1,56 @@
 .features {
   display: flex;
   align-items: center;
-  padding: 2rem 0;
+  padding: 4rem 0;
   width: 100%;
+  background: linear-gradient(
+    180deg,
+    var(--ifm-background-color) 0%,
+    var(--ifm-background-surface-color) 100%
+  );
 }
 
 .featureSvg {
-  height: 200px;
-  width: 200px;
+  height: 160px;
+  width: 160px;
+  margin-bottom: 1rem;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  opacity: 0.9;
+}
+
+/* Subtle hover interaction */
+.featureSvg:hover {
+  transform: translateY(-6px) scale(1.03);
+  opacity: 1;
+}
+
+/* Improve spacing between feature cards */
+:global(.col--4) {
+  padding: 1.5rem;
+}
+
+/* Typography polish */
+:global(.col--4 h3) {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.5rem;
+}
+
+/* Paragraph readability */
+:global(.col--4 p) {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--ifm-color-content-secondary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 996px) {
+  .featureSvg {
+    height: 130px;
+    width: 130px;
+  }
+
+  .features {
+    padding: 3rem 0;
+  }
 }

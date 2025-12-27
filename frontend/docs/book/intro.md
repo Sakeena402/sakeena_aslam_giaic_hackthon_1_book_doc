@@ -19,4 +19,4 @@ Each module contains multiple chapters that progress from fundamental concepts t
 
 Use the sidebar navigation to access different modules and chapters. Start with the module that aligns with your current knowledge level and learning objectives.
 
-Begin your journey with [Module 01: The Robotic Nervous System](../modules/ros2/index).
+Begin your journey with [Module 01: The Robotic Nervous System](../modules/ros2/).

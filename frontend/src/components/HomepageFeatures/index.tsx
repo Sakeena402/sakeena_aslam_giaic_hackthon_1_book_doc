@@ -1,4 +1,4 @@
-import type {ReactNode} from 'react';
+import type { ReactNode } from 'react';
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
 import styles from './styles.module.css';
@@ -11,38 +11,42 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Easy to Use',
+    title: 'Physical AI & Humanoid Robotics',
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Explore how artificial intelligence moves beyond screens into the real
+        world. This book focuses on embodied intelligence, where AI systems
+        perceive, reason, and act through humanoid robots in physical
+        environments.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
+    title: 'From Simulation to Reality',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Learn how Digital Twins, physics simulation, and AI-powered perception
+        enable safe and scalable robot development. Concepts progress from ROS 2
+        foundations to high-fidelity simulation and autonomous navigation.
       </>
     ),
   },
   {
-    title: 'Powered by React',
+    title: 'Vision, Language, and Action',
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Understand how modern AI models transform natural language and visual
+        perception into real robot actions. The book culminates in building an
+        autonomous humanoid capable of planning, navigation, and interaction.
       </>
     ),
   },
 ];
 
-function Feature({title, Svg, description}: FeatureItem) {
+function Feature({ title, Svg, description }: FeatureItem) {
   return (
     <div className={clsx('col col--4')}>
       <div className="text--center">
