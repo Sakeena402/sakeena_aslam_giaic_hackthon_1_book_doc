@@ -30,17 +30,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Import from modular services
-from .config.settings import Config
-from .services.ingestion import ContentExtractor
-from .models.dataclasses import ContentPage, ContentChunk, EmbeddingVector, StoredVector, Query, RetrievedChunk, ValidationResult, RetrievalRequest, RetrievalResponse, ContentPageState
-from .services.chunking import ContentChunker
-from .services.embedding import EmbeddingGenerator
-from .services.storage import VectorStorage
-from .services.retrieval import QdrantRetriever, simple_retrieve_chunks
-from .services.validation import validate_retrieval_results, validate_semantic_relevance, validate_metadata_accuracy, validate_consistency
-from .utils.helpers import setup_logging, retry_with_backoff, validate_embedding_dimensions
-from .utils.validators import validate_chunk_integrity, validate_chunk_list_integrity
+# Import from modular services using relative imports
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+
+from backend.config.settings import Config
+from backend.services.ingestion import ContentExtractor
+from backend.models.dataclasses import ContentPage, ContentChunk, EmbeddingVector, StoredVector, Query, RetrievedChunk, ValidationResult, RetrievalRequest, RetrievalResponse, ContentPageState
+from backend.services.chunking import ContentChunker
+from backend.services.embedding import EmbeddingGenerator
+from backend.services.storage import VectorStorage
+from backend.services.retrieval import EnhancedQdrantRetriever
+from backend.services.validation import validate_retrieval_results, validate_semantic_relevance, validate_metadata_accuracy, validate_consistency
+from backend.utils.helpers import setup_logging, retry_with_backoff, validate_embedding_dimensions
+from backend.utils.validators import validate_chunk_integrity, validate_chunk_list_integrity
 
 # -------------------- Safe Initialization --------------------
 all_chunks: List[ContentChunk] = []
@@ -141,10 +146,10 @@ def main():
         for query_text in queries:
             logger.info(f"Processing retrieval query: {query_text}")
             try:
-                # Use the simple_retrieve_chunks function from the retrieval module
-                retrieved_chunks = simple_retrieve_chunks(
+                # Use the EnhancedQdrantRetriever to retrieve chunks
+                retriever = EnhancedQdrantRetriever(config)
+                retrieved_chunks = retriever.retrieve_similar_chunks(
                     query_text=query_text,
-                    config=config,
                     top_k=args.top_k,
                     similarity_threshold=args.similarity_threshold
                 )
@@ -178,7 +183,10 @@ def main():
 
     # -------------------- Content Pipeline --------------------
     extracted_pages_count = len([cp for cp in content_pages if cp.state == ContentPageState.EXTRACTED])
+    failed_pages_count = len([cp for cp in content_pages if cp.state == ContentPageState.FAILED])
     logger.info(f"Successfully extracted content from {extracted_pages_count} pages out of {len(content_pages)} total")
+    if failed_pages_count > 0:
+        logger.warning(f"Failed to extract content from {failed_pages_count} pages")
 
     # Initialize variables safely
     global all_chunks, embeddings, stored_vectors
@@ -186,10 +194,13 @@ def main():
     embeddings = []
     stored_vectors = []
 
+    # Only process pages that were successfully extracted
+    successful_content_pages = [cp for cp in content_pages if cp.state == ContentPageState.EXTRACTED]
+
     if extracted_pages_count > 0:
         # Chunk the content
         chunker = ContentChunker(chunk_size=config.chunk_size, overlap_size=config.overlap_size)
-        for content_page in content_pages:
+        for content_page in successful_content_pages:
             if content_page.state == ContentPageState.EXTRACTED:
                 chunks = chunker.chunk_content_page(content_page)
                 all_chunks.extend(chunks)
@@ -202,19 +213,26 @@ def main():
             logger.info(f"Generated {len(embeddings)} embeddings")
 
             # Store vectors
-            if embeddings:
-                storage = VectorStorage(config.qdrant_url, config.qdrant_api_key, config.qdrant_collection_name)
-                stored_vectors = storage.store_embeddings(embeddings, all_chunks)
-                logger.info(f"Stored {len(stored_vectors)} vectors in Qdrant")
+            if embeddings and all_chunks:  # Make sure we have both embeddings and chunks
+                try:
+                    storage = VectorStorage(config.qdrant_url, config.qdrant_api_key, config.qdrant_collection_name)
+                    stored_vectors = storage.store_embeddings(embeddings, all_chunks)
+                    logger.info(f"Stored {len(stored_vectors)} vectors in Qdrant")
 
-                if args.validate:
-                    logger.info("Running validation...")
-                    print(f"Validation: Successfully stored {len(stored_vectors)} vectors in Qdrant")
+                    if args.validate:
+                        logger.info("Running validation...")
+                        print(f"Validation: Successfully stored {len(stored_vectors)} vectors in Qdrant")
+                except Exception as e:
+                    logger.error(f"Failed to store vectors in Qdrant: {str(e)}")
+                    print(f"Error storing vectors: {str(e)}")
+                    # Continue with the process even if storage fails
+                    stored_vectors = []
 
     # -------------------- Final Summary --------------------
     print(
         f"System completed processing. "
-        f"Extracted {extracted_pages_count} pages, "
+        f"Successfully extracted {extracted_pages_count} pages, "
+        f"failed to extract {failed_pages_count} pages, "
         f"created {len(all_chunks)} chunks, "
         f"generated {len(embeddings)} embeddings, "
         f"stored {len(stored_vectors)} vectors in Qdrant."
