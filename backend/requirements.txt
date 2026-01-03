@@ -4,3 +4,5 @@ cohere>=5.0.0
 qdrant-client>=1.8.0
 python-dotenv>=1.0.0
 pytest>=7.4.0
+openai>=1.10.0
+agents>=0.1.0

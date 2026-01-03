@@ -101,8 +101,8 @@ This module handles embedding generation and validation with batching and rate-l
 import cohere
 import time
 from typing import List
-from backend.models.dataclasses import ContentChunk, EmbeddingVector, EmbeddingVectorState
-from backend.utils.helpers import setup_logging
+from ..models.dataclasses import ContentChunk, EmbeddingVector, EmbeddingVectorState
+from ..utils.helpers import setup_logging
 
 logger = setup_logging()
 
@@ -115,14 +115,14 @@ class EmbeddingGenerator:
         self.model_name = model_name
 
     def generate_embeddings(
-        self, chunks: List[ContentChunk], batch_size: int = 5
+        self, chunks: List[ContentChunk], batch_size: int = 1  # Reduce batch size to 1 for better rate limiting control
     ) -> List[EmbeddingVector]:
         """
-        Generate embeddings for content chunks using Cohere with batching, rate limiting, and retry logic.
+        Generate embeddings for content chunks using Cohere with proper rate limiting and retry logic.
 
         Args:
             chunks: List of ContentChunk objects
-            batch_size: Number of chunks to send per request
+            batch_size: Number of chunks to send per request (reduced to 1 for better rate limiting)
 
         Returns:
             List of EmbeddingVector objects
@@ -133,54 +133,120 @@ class EmbeddingGenerator:
 
         embeddings_result = []
 
-        # Split chunks into batches
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i : i + batch_size]
-            texts = [chunk.content for chunk in batch]
+        # Process chunks one at a time to ensure proper rate limiting
+        for i, chunk in enumerate(chunks):
+            # Skip empty or very short chunks
+            if not chunk.content or len(chunk.content.strip()) < 10:
+                logger.warning(f"Skipping chunk {chunk.id} with insufficient content for embedding")
+                continue
 
             max_retries = 5
-            delay = 1.5  # initial wait for exponential backoff
+            delay = 1.5  # Start with 1.5 seconds as requested
 
             for attempt in range(max_retries):
                 try:
                     response = self.client.embed(
-                        texts=texts,
+                        texts=[chunk.content],
                         model=self.model_name,
                         input_type="search_document",
                     )
 
-                    for j, emb_values in enumerate(response.embeddings):
+                    if response.embeddings and len(response.embeddings) > 0:
                         emb_vector = EmbeddingVector(
-                            chunk_id=batch[j].id,
-                            vector=emb_values,
+                            chunk_id=chunk.id,
+                            vector=response.embeddings[0],  # Take first (and only) embedding
                             model_name=self.model_name,
                             model_version="3.0",
                             state=EmbeddingVectorState.EMBEDDED,
                         )
                         embeddings_result.append(emb_vector)
 
-                    logger.info(f"Generated embeddings for batch {i}-{i+len(batch)}")
+                        logger.info(f"Generated embedding for chunk {chunk.id} (chunk {i+1}/{len(chunks)})")
+                        time.sleep(1.5)  # 1.5 second delay between requests as requested
+                    else:
+                        logger.warning(f"No embeddings returned for chunk {chunk.id}")
+
                     break  # exit retry loop if successful
 
                 except Exception as e:
                     err_str = str(e).lower()
                     if "429" in err_str or "too many requests" in err_str or "rate limit" in err_str:
                         logger.warning(
-                            f"Rate limit exceeded on batch {i}-{i+len(batch)}, attempt {attempt+1}, waiting {delay}s..."
+                            f"Rate limit exceeded on chunk {chunk.id}, attempt {attempt+1}, waiting {delay}s..."
                         )
-                    elif "connection" in err_str or "network" in err_str:
+                    elif "connection" in err_str or "network" in err_str or "timeout" in err_str:
                         logger.warning(
-                            f"Network error on batch {i}-{i+len(batch)}, attempt {attempt+1}, waiting {delay}s..."
+                            f"Network/timeout error on chunk {chunk.id}, attempt {attempt+1}, waiting {delay}s..."
                         )
                     else:
-                        logger.error(f"Failed to generate embeddings for batch {i}-{i+len(batch)}: {e}")
-                        break  # non-retriable error
+                        logger.error(f"Failed to generate embedding for chunk {chunk.id}: {e}")
+                        if attempt == max_retries - 1:  # Last attempt
+                            logger.error(f"All {max_retries} attempts failed for chunk {chunk.id}")
+                            # Continue to next chunk instead of stopping the entire process
+                            break
 
                     time.sleep(delay)
                     delay *= 2  # exponential backoff
 
-                if attempt == max_retries - 1:
-                    logger.error(f"All retries failed for batch {i}-{i+len(batch)}")
-
-        logger.info(f"Generated total embeddings: {len(embeddings_result)}")
+        logger.info(f"Generated total embeddings: {len(embeddings_result)} out of {len(chunks)} attempted")
         return embeddings_result
+
+    def generate_single_embedding(self, text: str) -> List[float]:
+        """
+        Generate a single embedding for a given text string with proper rate limiting.
+
+        Args:
+            text: Input text to generate embedding for
+
+        Returns:
+            List of float values representing the embedding vector
+        """
+        if not text or not text.strip():
+            logger.warning("Empty text provided for single embedding generation")
+            return []
+
+        # Skip very short text that doesn't make sense to embed
+        if len(text.strip()) < 10:
+            logger.warning(f"Text too short ({len(text)} chars) to embed: '{text[:50]}...'")
+            return []
+
+        max_retries = 5  # Increased max retries
+        delay = 1.5  # Start with 1.5 seconds as requested
+
+        for attempt in range(max_retries):
+            try:
+                response = self.client.embed(
+                    texts=[text],
+                    model=self.model_name,
+                    input_type="search_query"  # Using search_query for query embeddings
+                )
+
+                if response.embeddings and len(response.embeddings) > 0:
+                    logger.info(f"Generated single embedding for text of length {len(text)}")
+                    # Add rate limiting delay after successful request
+                    time.sleep(1.5)  # 1.5-2 second delay as requested
+                    return response.embeddings[0]  # Return the first embedding as a list of floats
+                else:
+                    logger.warning("No embeddings returned from API")
+                    return []
+
+            except Exception as e:
+                err_str = str(e).lower()
+                if "429" in err_str or "too many requests" in err_str or "rate limit" in err_str:
+                    logger.warning(f"Rate limit exceeded on single embedding attempt {attempt+1}, waiting {delay}s...")
+                    time.sleep(delay)
+                    delay *= 2  # Exponential backoff
+                elif "connection" in err_str or "network" in err_str or "timeout" in err_str:
+                    logger.warning(f"Network/timeout error on single embedding attempt {attempt+1}, waiting {delay}s...")
+                    time.sleep(delay)
+                    delay *= 2  # Exponential backoff
+                else:
+                    logger.error(f"Failed to generate single embedding: {e}")
+                    if attempt == max_retries - 1:  # Last attempt
+                        logger.error(f"All {max_retries} attempts failed for single embedding")
+                        raise e
+                    else:
+                        # Wait before retrying for other errors too
+                        time.sleep(delay)
+                        delay *= 2
+        return []

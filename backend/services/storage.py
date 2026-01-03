@@ -71,17 +71,36 @@ class VectorStorage:
                 logger.warning(f"No matching content chunk found for embedding: {emb_vector.chunk_id}")
                 continue
 
-            # Prepare payload with metadata
+            # Extract section from URL (e.g., from https://.../docs/modules/ros2/chapter1, extract 'ros2')
+            url_parts = chunk.source_page_url.split('/')
+            section = ""
+            for i, part in enumerate(url_parts):
+                if part == "modules" and i + 1 < len(url_parts):
+                    section = url_parts[i + 1]
+                    break
+
+            # Extract chapter from URL (e.g., from https://.../docs/modules/ros2/chapter1, extract 'chapter1')
+            chapter = ""
+            for i, part in enumerate(url_parts):
+                if part.startswith("chapter") or part.startswith("lesson"):
+                    chapter = part
+                    break
+
+            # Prepare payload with rich metadata as required
             payload = {
                 "url": chunk.source_page_url,
+                "page_title": chunk.source_page_url.split('/')[-1] or chunk.source_page_url,  # Extract title from URL
+                "section_heading": chunk.heading_context or "",  # Use heading context if available
                 "chunk_index": chunk.chunk_index,
-                "content_preview": chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content,
-                "source_created_at": str(chunk.original_start_pos),  # This might need adjustment
+                "content": chunk.content,  # Store full content instead of preview
+                "source_created_at": str(datetime.now()),  # Use actual datetime instead of position
+                "section": section,  # Extracted section from URL
+                "chapter": chapter,   # Extracted chapter from URL
             }
 
-            # Add heading context if available
+            # Add additional metadata fields
             if chunk.heading_context:
-                payload["heading_context"] = chunk.heading_context
+                payload["section_heading"] = chunk.heading_context
 
             # Create Qdrant point
             point_id = str(uuid.uuid4())
@@ -97,10 +116,12 @@ class VectorStorage:
                 id=point_id,
                 vector=emb_vector.vector,
                 url=chunk.source_page_url,
-                title=chunk.heading_context or chunk.source_page_url.split('/')[-1],  # Use heading or URL as title
+                title=payload["page_title"],  # Use the page title from payload
                 chunk_index=chunk.chunk_index,
-                content_preview=payload["content_preview"],
+                content_preview=chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content,  # Still provide a preview for the StoredVector object
                 source_created_at=datetime.now(),  # This should come from the original content page
+                page_title=payload["page_title"],  # Set the new field
+                section_heading=payload.get("section_heading", ""),  # Set the new field
                 chapter="",  # This would need to be extracted from the content structure
                 section="",  # This would need to be extracted from the content structure
                 collection_name=self.collection_name,

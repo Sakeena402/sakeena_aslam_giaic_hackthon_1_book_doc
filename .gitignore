@@ -68,7 +68,7 @@ backend/*.pyc
 *.log
 /backend/.env
 *.env
-
+notes.txt
 
 # Distribution / packaging
 .Python

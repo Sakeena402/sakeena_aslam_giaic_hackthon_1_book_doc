@@ -92,13 +92,14 @@ def time_it(func: Callable) -> Callable:
     return wrapper
 
 
-def chunk_text(text: str, chunk_size: int, overlap_size: int = 0) -> list:
+def chunk_text(text: str, min_chunk_size: int = 300, max_chunk_size: int = 1000, overlap_size: int = 50) -> list:
     """
-    Split text into chunks of specified size with optional overlap.
+    Split text into semantic chunks with specified size constraints.
 
     Args:
         text: The text to chunk
-        chunk_size: Size of each chunk
+        min_chunk_size: Minimum size of each chunk (300-400 chars)
+        max_chunk_size: Maximum size of each chunk (800-1000 chars)
         overlap_size: Size of overlap between chunks
 
     Returns:
@@ -108,42 +109,176 @@ def chunk_text(text: str, chunk_size: int, overlap_size: int = 0) -> list:
         return []
 
     chunks = []
-    start_idx = 0
 
-    while start_idx < len(text):
-        end_idx = start_idx + chunk_size
+    # Split text into logical paragraphs/sections first
+    paragraphs = text.split('\n\n')
 
-        # If we're near the end, make sure we include the remainder
-        if end_idx >= len(text):
-            end_idx = len(text)
+    current_chunk = ""
+    for paragraph in paragraphs:
+        paragraph = paragraph.strip()
+        if not paragraph:
+            continue
+
+        # Check if adding this paragraph would exceed max size
+        potential_chunk = current_chunk + ('\n\n' if current_chunk else '') + paragraph
+
+        if len(potential_chunk) <= max_chunk_size:
+            # Safe to add to current chunk
+            current_chunk = potential_chunk
         else:
-            # Try to break at sentence boundaries
-            # Look for sentence-ending punctuation within the last 100 characters
-            chunk_content = text[start_idx:end_idx]
-            sentence_break_found = False
+            # Check if current chunk is substantial enough to be saved
+            if len(current_chunk) >= min_chunk_size:
+                # Save the current chunk and start a new one with this paragraph
+                chunks.append(current_chunk)
+                current_chunk = paragraph
+            else:
+                # Current chunk is too small, but adding paragraph would exceed max
+                # Try to split the paragraph if it's too large
+                if len(paragraph) > max_chunk_size:
+                    # Split the large paragraph into smaller chunks
+                    sub_chunks = _split_large_paragraph(paragraph, min_chunk_size, max_chunk_size)
+                    if current_chunk:
+                        # Add current chunk before processing sub-chunks
+                        chunks.append(current_chunk)
+                        current_chunk = ""
 
-            # Look for sentence boundaries near the end of the chunk
-            for i in range(len(chunk_content) - 1, len(chunk_content) - 100, -1):
-                if i > 0 and chunk_content[i] in '.!?':
-                    # Found a sentence boundary, break after the punctuation
-                    end_idx = start_idx + i + 1
-                    sentence_break_found = True
-                    break
+                    # Add sub-chunks (except the last one) to main chunks list
+                    if len(sub_chunks) > 1:
+                        chunks.extend(sub_chunks[:-1])
+                        # Keep the last sub-chunk as the current chunk
+                        current_chunk = sub_chunks[-1]
+                    else:
+                        # Only one sub-chunk, add it to current
+                        current_chunk = sub_chunks[0] if sub_chunks else ""
+                else:
+                    # Current chunk is too small but paragraph is within limits
+                    # Combine them into a new chunk
+                    current_chunk = potential_chunk
 
-            # If no sentence boundary found, look for paragraph boundaries
-            if not sentence_break_found:
-                for i in range(len(chunk_content) - 1, len(chunk_content) - 100, -1):
-                    if i > 0 and chunk_content[i] == '\n' and chunk_content[i-1] == '\n':
-                        # Found a paragraph boundary
-                        end_idx = start_idx + i + 1
-                        sentence_break_found = True
-                        break
-
-        # Extract the chunk content
-        chunk_text = text[start_idx:end_idx]
-        chunks.append(chunk_text)
-
-        # Move to the next position, accounting for overlap
-        start_idx = end_idx - (overlap_size if end_idx < len(text) else 0)
+    # Add the final chunk if it's substantial
+    if current_chunk and len(current_chunk) >= min_chunk_size:
+        chunks.append(current_chunk)
+    elif current_chunk and chunks:
+        # If final chunk is too small, append it to the last chunk if it exists
+        last_chunk = chunks[-1]
+        if len(last_chunk) + len(current_chunk) <= max_chunk_size:
+            chunks[-1] = last_chunk + ('\n\n' + current_chunk if current_chunk.strip() else current_chunk)
+        elif len(current_chunk) >= 50:  # If it's at least somewhat substantial, add as separate chunk
+            chunks.append(current_chunk)
+    elif current_chunk and len(current_chunk) >= 50:
+        # If there's no previous chunk but current one is substantial, add it
+        chunks.append(current_chunk)
 
     return chunks
+
+
+def _split_large_paragraph(paragraph: str, min_chunk_size: int, max_chunk_size: int) -> list:
+    """
+    Split a large paragraph into smaller chunks based on sentences or semantic boundaries.
+
+    Args:
+        paragraph: The large paragraph to split
+        min_chunk_size: Minimum chunk size
+        max_chunk_size: Maximum chunk size
+
+    Returns:
+        List of sub-chunks
+    """
+    if len(paragraph) <= max_chunk_size:
+        return [paragraph]
+
+    sub_chunks = []
+    sentences = []
+
+    # Split into sentences
+    import re
+    # Split by sentence endings, keeping the punctuation
+    sentence_parts = re.split(r'([.!?]+)', paragraph)
+
+    # Reconstruct sentences with their punctuation
+    i = 0
+    while i < len(sentence_parts):
+        if i + 1 < len(sentence_parts) and re.match(r'[.!?]+', sentence_parts[i + 1]):
+            # This is a sentence followed by punctuation
+            sentence = sentence_parts[i] + sentence_parts[i + 1]
+            sentences.append(sentence.strip())
+            i += 2
+        else:
+            # This might be a part without punctuation
+            sentences.append(sentence_parts[i].strip())
+            i += 1
+
+    # Clean up empty sentences
+    sentences = [s for s in sentences if s.strip()]
+
+    current_sub_chunk = ""
+    for sentence in sentences:
+        potential_sub_chunk = current_sub_chunk + (' ' if current_sub_chunk else '') + sentence
+
+        if len(potential_sub_chunk) <= max_chunk_size:
+            current_sub_chunk = potential_sub_chunk
+        else:
+            # Check if current sub-chunk is substantial
+            if len(current_sub_chunk) >= min_chunk_size:
+                # Save current and start new
+                sub_chunks.append(current_sub_chunk)
+                current_sub_chunk = sentence
+            else:
+                # Current sub-chunk is too small, try to split sentence
+                if len(sentence) > max_chunk_size:
+                    # Sentence is too long, split it by words
+                    words = sentence.split()
+                    temp_chunk = current_sub_chunk
+                    temp_sentence = ""
+
+                    for word in words:
+                        potential = temp_sentence + (' ' if temp_sentence else '') + word
+                        if len(temp_chunk + (' ' if temp_chunk else '') + potential) <= max_chunk_size:
+                            temp_sentence += (' ' if temp_sentence else '') + word
+                        else:
+                            if temp_sentence:
+                                if temp_chunk:
+                                    sub_chunks.append(temp_chunk + (' ' if temp_chunk else '') + temp_sentence)
+                                else:
+                                    sub_chunks.append(temp_sentence)
+                                temp_chunk = ""
+                                temp_sentence = word
+                            else:
+                                # If even a single word is too much, force split
+                                if len(word) > max_chunk_size:
+                                    sub_chunks.extend(_force_split_long_word(word, max_chunk_size))
+                                else:
+                                    temp_sentence = word
+                    if temp_sentence:
+                        if temp_chunk:
+                            sub_chunks.append(temp_chunk + (' ' if temp_chunk else '') + temp_sentence)
+                        else:
+                            sub_chunks.append(temp_sentence)
+                else:
+                    # Start a new chunk with this sentence
+                    if current_sub_chunk:
+                        sub_chunks.append(current_sub_chunk)
+                    current_sub_chunk = sentence
+
+    # Add the final sub-chunk if it exists
+    if current_sub_chunk:
+        sub_chunks.append(current_sub_chunk)
+
+    return sub_chunks
+
+
+def _force_split_long_word(word: str, max_chunk_size: int) -> list:
+    """
+    Force split a very long word into smaller parts.
+
+    Args:
+        word: The long word to split
+        max_chunk_size: Maximum size for each part
+
+    Returns:
+        List of word parts
+    """
+    parts = []
+    for i in range(0, len(word), max_chunk_size):
+        parts.append(word[i:i + max_chunk_size])
+    return parts
